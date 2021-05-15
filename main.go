@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/asticode/go-astisub"
-	  "github.com/ikawaha/kagome-dict/ipa"
-	  "github.com/ikawaha/kagome/v2/tokenizer"
+	"github.com/ikawaha/kagome-dict/ipa"
+	"github.com/ikawaha/kagome/v2/tokenizer"
 )
 
 // Should return array of filepaths from a filepath
@@ -31,7 +31,7 @@ func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 	return func(path string, d fs.DirEntry, err error) error {
 		// If file ext matches with specified ext, return true.
 		// Split filename by ".", get last segment.
-//		log.Println(path)
+		//		log.Println(path)
 		if err == nil && !d.IsDir() {
 			segs := strings.Split(d.Name(), ".")
 			if len(segs) <= 1 {
@@ -68,7 +68,7 @@ func main() {
 
 	// Get text from files
 	for _, f := range *files {
-    fmt.Println(f)
+		fmt.Println(f)
 		subs, err := astisub.OpenFile(f) // Copy this to walk func
 		if err != nil {
 			log.Println(err)
@@ -78,7 +78,7 @@ func main() {
 			subsString += item.String()
 		}
 		seg := t.Wakati(subsString)
-//		fmt.Println(seg)
+		//		fmt.Println(seg)
 
 		for _, token := range seg {
 			fmt.Println(token)

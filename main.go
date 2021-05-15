@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/asticode/go-astisub"
@@ -33,6 +35,7 @@ func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 		// Split filename by ".", get last segment.
 		//		log.Println(path)
 		if err == nil && !d.IsDir() {
+			// USE filepath.Ext(string) instead
 			segs := strings.Split(d.Name(), ".")
 			if len(segs) <= 1 {
 				return nil
@@ -49,7 +52,8 @@ func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 
 func main() {
 	// Get subfile extension(s) from cli args (not done)
-	root := flag.String("path", "", "file/root directory")
+	root := flag.String("in", "", "file/root directory to process")
+	outPath := flag.String("out", "", "where to save file")
 	flag.Parse()
 	if *root == "" {
 		log.Println("must provide a filepath")
@@ -65,6 +69,7 @@ func main() {
 	}
 	// wakati
 	fmt.Println("---wakati---")
+	frequencies := make(map[string]int)
 
 	// Get text from files
 	for _, f := range *files {
@@ -78,12 +83,62 @@ func main() {
 			subsString += item.String()
 		}
 		seg := t.Wakati(subsString)
-		//		fmt.Println(seg)
 
 		for _, token := range seg {
-			fmt.Println(token)
+			frequencies[token]++
 		}
 	}
 
 	// Sort tokens by frequency
+
+	keys := make([]string, 0, len(frequencies))
+	for k := range frequencies {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		// desc order
+		return frequencies[keys[i]] > frequencies[keys[j]]
+	})
+
+	var out string
+	for _, k := range keys {
+		out = fmt.Sprintln(out, k, frequencies[k])
+	}
+
+	// Save result to file
+	if *outPath == "" {
+		*outPath = *root // What happens if you don't use pointers?
+	}
+	actualOutPath, _ := filepath.Abs(*outPath)
+
+	fi, err := os.Lstat(actualOutPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch mode := fi.Mode(); {
+	case mode.IsRegular():
+		actualOutPath = filepath.Dir(actualOutPath)
+	}
+	actualOutPath += "/freq.txt"
+
+	err = WriteToFile(actualOutPath, out)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func WriteToFile(filename string, data string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, data)
+	if err != nil {
+		return err
+	}
+	return file.Sync()
 }

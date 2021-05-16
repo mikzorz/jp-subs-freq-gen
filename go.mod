@@ -1,4 +1,4 @@
-module github.com/mikzorz/anime-sub-frequency-list-generator
+module github.com/mikzorz/anime-freq-gen
 
 go 1.16
 

@@ -15,6 +15,7 @@ import (
 	"github.com/asticode/go-astisub"
 	"github.com/ikawaha/kagome-dict/ipa"
 	"github.com/ikawaha/kagome/v2/tokenizer"
+	"golang.org/x/text/width"
 )
 
 var junkTokens = []string{"(", " ", "の", "は", "て", "に", "が", "た", "を", "だ", "で", "な", "と", "よ", "ない", "N", "-", "（", "）", "？", "　", "…", "！", "”", "“", "･", "—", "➡", ")”", "♪〜〜♪", "≪(", " 〞", "「", "｣", "｣｢", "[", "]", "♬", "ｯ", "１", "２", "３", "４", "５", "６", "７", "８", "９", "０", "\\"}
@@ -24,7 +25,7 @@ var verbose bool
 
 func main() {
 	// Get subfile extension(s) from cli args (not done)
-  parseFlags()
+	parseFlags()
 
 	files := getFiles(root, true)
 
@@ -39,9 +40,9 @@ func main() {
 
 	// Get text from files
 	for _, f := range *files {
-    if verbose {
-		 fmt.Println("Processing", f)
-    }
+		if verbose {
+			fmt.Println("Processing", f)
+		}
 		subs, err := astisub.OpenFile(f) // Copy this to walk func
 		if err != nil {
 			log.Println(err)
@@ -82,9 +83,16 @@ func main() {
 	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
 	// The actual useful info.
 	for _, k := range keys {
-		// Regular japanese have a length of 3. This does not work for half-width, non-japanese characters or long words.
-		shortenBy := strconv.Itoa(tColW - (len(k) / 3))
-		fmtstr := "|%-" + shortenBy + "s|%-" + strconv.Itoa(fColW) + "d|\n"
+		shortenBy := 0
+		// If character is a fullwidth char, add 1 to shortenBy.
+		for _, r := range k {
+			p := width.LookupRune(r)
+			if p.Kind() == width.EastAsianWide || p.Kind() == width.EastAsianFullwidth {
+				shortenBy++
+			}
+		}
+		curTColW := strconv.Itoa(tColW - shortenBy)
+		fmtstr := "|%-" + curTColW + "s|%-" + strconv.Itoa(fColW) + "d|\n"
 		out += fmt.Sprintf(fmtstr, k, frequencies[k])
 	}
 
@@ -112,9 +120,9 @@ func main() {
 }
 
 func parseFlags() {
-  flag.StringVar(&root, "in", "", "filepath/root directory to parse")
+	flag.StringVar(&root, "in", "", "filepath/root directory to parse")
 	flag.StringVar(&outPath, "out", "", "destination of output file")
-  flag.BoolVar(&verbose, "v", false, "verbosity")
+	flag.BoolVar(&verbose, "v", false, "verbosity")
 	flag.Parse()
 	if root == "" {
 		log.Println("Must provide a filepath with -in")
@@ -140,13 +148,13 @@ func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 		// If file ext matches with specified ext, return true.
 		// Split filename by ".", get last segment.
 		if err == nil && !d.IsDir() {
-		  _, err := astisub.OpenFile(path) // Copy this to walk func
-		  if err != nil {
-        if verbose {
-		  	  log.Println(err)
-        }
-        return nil
-		  }
+			_, err := astisub.OpenFile(path) // Copy this to walk func
+			if err != nil {
+				if verbose {
+					log.Println(err)
+				}
+				return nil
+			}
 			// USE filepath.Ext(string) instead
 			//segs := strings.Split(d.Name(), ".")
 			//if len(segs) <= 1 {
@@ -154,7 +162,7 @@ func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 			//}
 			//ext := segs[len(segs)-1]
 			//if ext == "srt" || ext == "ass" {
-				files = append(files, path)
+			files = append(files, path)
 			//}
 		}
 		return nil

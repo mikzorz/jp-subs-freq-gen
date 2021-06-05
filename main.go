@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-  "unicode/utf8"
+	"unicode/utf8"
 
 	"github.com/asticode/go-astisub"
 	"github.com/ikawaha/kagome-dict/ipa"
@@ -39,7 +39,7 @@ func main() {
 
 	// wakati
 	frequencies := make(map[string]int)
-  longestTokenLen := 0
+	longestTokenLen := 0
 
 	// Get text from files
 	for _, f := range *files {
@@ -56,27 +56,27 @@ func main() {
 		}
 		seg := t.Wakati(subsString)
 		for _, token := range seg {
-      cleanToken := removeJunkFromToken(token)
-      if cleanToken == "" {
-        continue
-      }
+			cleanToken := removeJunkFromToken(token)
+			if cleanToken == "" {
+				continue
+			}
 			frequencies[cleanToken]++
-      if tokenLen := utf8.RuneCountInString(token); tokenLen > longestTokenLen {
-        longestTokenLen = tokenLen
-      }
+			if tokenLen := utf8.RuneCountInString(token); tokenLen > longestTokenLen {
+				longestTokenLen = tokenLen
+			}
 		}
 	}
 
 	// Sort tokens by frequency
 
-  heighestFreq := 0
+	heighestFreq := 0
 
 	keys := make([]string, 0, len(frequencies))
 	for token, freq := range frequencies {
 		keys = append(keys, token)
-    if freq > heighestFreq {
-      heighestFreq = freq
-    }
+		if freq > heighestFreq {
+			heighestFreq = freq
+		}
 	}
 
 	sort.Slice(keys, func(i, j int) bool {
@@ -85,7 +85,7 @@ func main() {
 	})
 
 	var out string
-	tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq)) + 4
+	tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq))+4
 
 	// Table Headers
 	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
@@ -205,11 +205,11 @@ func isJunkToken(token string) bool {
 }
 
 func removeJunkFromToken(token string) string {
-  cleanToken := token
-  for _, r := range token {
-    if isJunkToken(string(r)) {
-      cleanToken = strings.ReplaceAll(cleanToken, string(r), "")
-    }
-  }
-  return cleanToken
+	cleanToken := token
+	for _, r := range token {
+		if isJunkToken(string(r)) {
+			cleanToken = strings.ReplaceAll(cleanToken, string(r), "")
+		}
+	}
+	return cleanToken
 }

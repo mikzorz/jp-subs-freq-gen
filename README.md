@@ -1,6 +1,6 @@
 How to use:
 
-  go install
+  go install  
   anime-freq-gen -in "dir_or_subfile" -out "/path/to/output.txt" (optional) -v
 
 

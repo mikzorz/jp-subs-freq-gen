@@ -19,17 +19,35 @@ import (
 	"golang.org/x/text/width"
 )
 
-//var particles  = []string{"の", "は", "て", "に", "が", "た", "を", "だ", "で", "な", "と", "よ"}
-var junkTokens = []string{"(", " ", "一", "-", "（", "）", ")", "｡", "､", ".", "％", "～", "？", "　", "…", "！", "”", "“", "･", "—", "➡", "♪", "≪", "≫", "＞", "＜", "!", "‼", "?", "〞", "「", "｢", "｣", "[", "]", "♬", "１", "２", "３", "４", "５", "６", "７", "８", "９", "０", "\\"}
+type unicodeRange struct {
+	start, end int
+}
+
+var junkRanges = []unicodeRange{
+	unicodeRange{'　', '〿'},     // Japanese-style punctuation
+	unicodeRange{65280, 65504}, //Full-width roman characters and half-width katakana (ff00 - ffef)
+	unicodeRange{'!', '~'},     // C0 Controls and Basic Latin
+	unicodeRange{'←', '⇿'},     // Arrows
+	unicodeRange{'☀', '⛿'},     // Miscellaneous Symbols
+	unicodeRange{' ', ' '},     // Whitespace
+	unicodeRange{'…', '…'},
+}
+
+var hiraganaRange = unicodeRange{'ぁ', 'ゖ'}
+
 var root string
 var outPath string
+var recurse bool
 var verbose bool
 
 func main() {
-	// Get subfile extension(s) from cli args (not done)
 	parseFlags()
 
-	files := getFiles(root, true)
+	files := getFiles(root, recurse)
+	if len(*files) == 0 {
+		fmt.Println("No files found")
+		os.Exit(0)
+	}
 
 	// Tokenize text
 	t, err := tokenizer.New(ipa.Dict(), tokenizer.OmitBosEos())
@@ -133,11 +151,15 @@ func main() {
 func parseFlags() {
 	flag.StringVar(&root, "in", "", "filepath/root directory to parse")
 	flag.StringVar(&outPath, "out", "", "destination of output file")
+	flag.BoolVar(&recurse, "r", true, "search through child directories?")
 	flag.BoolVar(&verbose, "v", false, "verbosity")
 	flag.Parse()
 	if root == "" {
 		log.Println("Must provide a filepath with -in")
 		os.Exit(1)
+	}
+	if verbose {
+		log.Printf("\"recurse\" set to %t\n", recurse)
 	}
 }
 
@@ -153,28 +175,27 @@ func getFiles(root string, recurse bool) *[]string {
 	}
 	return files
 }
+
+var alreadyWalked = false
+
+// Should this return an error at some point?
 func checkIfSubFile() (fs.WalkDirFunc, *[]string) {
 	files := []string{}
 	return func(path string, d fs.DirEntry, err error) error {
-		// If file ext matches with specified ext, return true.
-		// Split filename by ".", get last segment.
+		if d.IsDir() && !recurse && alreadyWalked {
+			return fs.SkipDir
+		}
+		alreadyWalked = true
+
 		if err == nil && !d.IsDir() {
-			_, err := astisub.OpenFile(path) // Copy this to walk func
+			_, err := astisub.OpenFile(path)
 			if err != nil {
 				if verbose {
 					log.Println(err)
 				}
 				return nil
 			}
-			// USE filepath.Ext(string) instead
-			//segs := strings.Split(d.Name(), ".")
-			//if len(segs) <= 1 {
-			//	return nil
-			//}
-			//ext := segs[len(segs)-1]
-			//if ext == "srt" || ext == "ass" {
 			files = append(files, path)
-			//}
 		}
 		return nil
 	}, &files
@@ -195,20 +216,23 @@ func WriteToFile(filename string, data string) error {
 	return file.Sync()
 }
 
-func isJunkToken(token string) bool {
-	for _, jt := range junkTokens {
-		if token == jt {
-			return true
-		}
-	}
-	return false
-}
-
+// If token is just a single kana, return empty string.
+// If token contains junk, remove the junk from the token.
 func removeJunkFromToken(token string) string {
 	cleanToken := token
-	for _, r := range token {
-		if isJunkToken(string(r)) {
-			cleanToken = strings.ReplaceAll(cleanToken, string(r), "")
+	for i := hiraganaRange.start; i <= hiraganaRange.end; i++ {
+		if token == string(rune(i)) {
+			return ""
+		}
+	}
+
+	for _, char := range token {
+		for _, r := range junkRanges {
+			for i := r.start; i <= r.end; i++ {
+				if int(char) == i {
+					cleanToken = strings.ReplaceAll(cleanToken, string(char), "")
+				}
+			}
 		}
 	}
 	return cleanToken

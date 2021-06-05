@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+  "unicode/utf8"
 
 	"github.com/asticode/go-astisub"
 	"github.com/ikawaha/kagome-dict/ipa"
@@ -18,7 +19,8 @@ import (
 	"golang.org/x/text/width"
 )
 
-var junkTokens = []string{"(", " ", "の", "は", "て", "に", "が", "た", "を", "だ", "で", "な", "と", "よ", "ない", "N", "-", "（", "）", "？", "　", "…", "！", "”", "“", "･", "—", "➡", ")”", "♪〜〜♪", "≪(", " 〞", "「", "｣", "｣｢", "[", "]", "♬", "ｯ", "１", "２", "３", "４", "５", "６", "７", "８", "９", "０", "\\"}
+//var particles  = []string{"の", "は", "て", "に", "が", "た", "を", "だ", "で", "な", "と", "よ"}
+var junkTokens = []string{"(", " ", "一", "-", "（", "）", ")", "｡", "､", ".", "％", "～", "？", "　", "…", "！", "”", "“", "･", "—", "➡", "♪", "≪", "≫", "＞", "＜", "!", "‼", "?", "〞", "「", "｢", "｣", "[", "]", "♬", "１", "２", "３", "４", "５", "６", "７", "８", "９", "０", "\\"}
 var root string
 var outPath string
 var verbose bool
@@ -30,13 +32,14 @@ func main() {
 	files := getFiles(root, true)
 
 	// Tokenize text
-
 	t, err := tokenizer.New(ipa.Dict(), tokenizer.OmitBosEos())
 	if err != nil {
 		panic(err)
 	}
+
 	// wakati
 	frequencies := make(map[string]int)
+  longestTokenLen := 0
 
 	// Get text from files
 	for _, f := range *files {
@@ -53,18 +56,27 @@ func main() {
 		}
 		seg := t.Wakati(subsString)
 		for _, token := range seg {
-			if skipJunk(token) {
-				continue
-			}
-			frequencies[token]++
+      cleanToken := removeJunkFromToken(token)
+      if cleanToken == "" {
+        continue
+      }
+			frequencies[cleanToken]++
+      if tokenLen := utf8.RuneCountInString(token); tokenLen > longestTokenLen {
+        longestTokenLen = tokenLen
+      }
 		}
 	}
 
 	// Sort tokens by frequency
 
+  heighestFreq := 0
+
 	keys := make([]string, 0, len(frequencies))
-	for k := range frequencies {
-		keys = append(keys, k)
+	for token, freq := range frequencies {
+		keys = append(keys, token)
+    if freq > heighestFreq {
+      heighestFreq = freq
+    }
 	}
 
 	sort.Slice(keys, func(i, j int) bool {
@@ -72,15 +84,14 @@ func main() {
 		return frequencies[keys[i]] > frequencies[keys[j]]
 	})
 
-	// Token column width should be based on longest token.
-	// Frequency column width should be based on longest frequency number.
-	// Hardcoded temporarily.
 	var out string
-	tColW, fColW := 20, 10
+	tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq)) + 4
+
 	// Table Headers
 	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
 	out += fmt.Sprintf("|%-"+strconv.Itoa(tColW)+"s|%-"+strconv.Itoa(fColW)+"s|\n", "Token", "Freq")
 	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
+
 	// The actual useful info.
 	for _, k := range keys {
 		shortenBy := 0
@@ -184,11 +195,21 @@ func WriteToFile(filename string, data string) error {
 	return file.Sync()
 }
 
-func skipJunk(token string) bool {
+func isJunkToken(token string) bool {
 	for _, jt := range junkTokens {
 		if token == jt {
 			return true
 		}
 	}
 	return false
+}
+
+func removeJunkFromToken(token string) string {
+  cleanToken := token
+  for _, r := range token {
+    if isJunkToken(string(r)) {
+      cleanToken = strings.ReplaceAll(cleanToken, string(r), "")
+    }
+  }
+  return cleanToken
 }

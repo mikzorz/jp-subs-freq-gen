@@ -1,14 +1,7 @@
-How to use:
+Install with `go install`
 
-  go install  
-  anime-freq-gen -in "dir_or_subfile" -out "/path/to/output.txt" (optional) -v
+```
+anime-freq-gen -in /path/to/dir/or/subfile -out /path/to/directory (optional) -v (optional)
+```
 
-
-Results contain junk.
-
-Output could be more nicely formated.
-  Half width characters destroy the layout.
-
-Concurrency?
-
-Could get data from other frequency lists for comparison.
+Doesn't currently allow a custom output filename. Saves as freq.txt

@@ -11,5 +11,4 @@ Run with `anime-freq-gen` followed by the flags below.
 
 
 Doesn't currently allow a custom output filename. Always saves as freq.txt.  
-Output may contain some junk.  
 Output may not look nice if not viewed with a monospaced font.  

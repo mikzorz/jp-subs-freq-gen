@@ -23,14 +23,12 @@ type unicodeRange struct {
 	start, end int
 }
 
-var junkRanges = []unicodeRange{
-	unicodeRange{'　', '〿'},     // Japanese-style punctuation
-	unicodeRange{65280, 65504}, //Full-width roman characters and half-width katakana (ff00 - ffef)
-	unicodeRange{'!', '~'},     // C0 Controls and Basic Latin
-	unicodeRange{'←', '⇿'},     // Arrows
-	unicodeRange{'☀', '⛿'},     // Miscellaneous Symbols
-	unicodeRange{' ', ' '},     // Whitespace
-	unicodeRange{'…', '…'},
+var validRanges = []unicodeRange{
+  unicodeRange{'\u3041', '\u3096'},
+  unicodeRange{'\u3099', '\u309f'},
+  unicodeRange{'\u30a1', '\u30fb'},
+  unicodeRange{'\u4e00', '\u9faf'},
+  unicodeRange{'\u3400', '\u4dbf'},
 }
 
 var hiraganaRange = unicodeRange{'ぁ', 'ゖ'}
@@ -220,20 +218,29 @@ func WriteToFile(filename string, data string) error {
 // If token contains junk, remove the junk from the token.
 func removeJunkFromToken(token string) string {
 	cleanToken := token
-	for i := hiraganaRange.start; i <= hiraganaRange.end; i++ {
-		if token == string(rune(i)) {
-			return ""
-		}
-	}
+
+  if utf8.RuneCountInString(token) == 1 {
+    uc := int([]rune(token)[0])
+    if hiraganaRange.start <= uc && uc <= hiraganaRange.end {
+      return ""
+    }
+
+    // The katakana dot separator. I want it removed if it's on its own but not elsewhere.
+    if uc == '\u30fb' {
+      return ""
+    }
+  }
 
 	for _, char := range token {
-		for _, r := range junkRanges {
-			for i := r.start; i <= r.end; i++ {
-				if int(char) == i {
-					cleanToken = strings.ReplaceAll(cleanToken, string(char), "")
-				}
+    inRange := false
+		for _, r := range validRanges {
+			if r.start <= int(char) && int(char) <= r.end {
+        inRange = true
 			}
 		}
+    if !inRange {
+		  cleanToken = strings.ReplaceAll(cleanToken, string(char), "")
+    }
 	}
 	return cleanToken
 }

@@ -24,11 +24,11 @@ type unicodeRange struct {
 }
 
 var validRanges = []unicodeRange{
-  unicodeRange{'\u3041', '\u3096'},
-  unicodeRange{'\u3099', '\u309f'},
-  unicodeRange{'\u30a1', '\u30fb'},
-  unicodeRange{'\u4e00', '\u9faf'},
-  unicodeRange{'\u3400', '\u4dbf'},
+	unicodeRange{'\u3041', '\u3096'},
+	unicodeRange{'\u3099', '\u309f'},
+	unicodeRange{'\u30a1', '\u30fb'},
+	unicodeRange{'\u4e00', '\u9faf'},
+	unicodeRange{'\u3400', '\u4dbf'},
 }
 
 var hiraganaRange = unicodeRange{'ぁ', 'ゖ'}
@@ -37,6 +37,7 @@ var root string
 var outPath string
 var recurse bool
 var verbose bool
+var wordList bool
 
 func main() {
 	parseFlags()
@@ -83,44 +84,53 @@ func main() {
 		}
 	}
 
-	// Sort tokens by frequency
-
-	heighestFreq := 0
-
-	keys := make([]string, 0, len(frequencies))
-	for token, freq := range frequencies {
-		keys = append(keys, token)
-		if freq > heighestFreq {
-			heighestFreq = freq
-		}
-	}
-
-	sort.Slice(keys, func(i, j int) bool {
-		// desc order
-		return frequencies[keys[i]] > frequencies[keys[j]]
-	})
-
 	var out string
-	tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq))+4
 
-	// Table Headers
-	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
-	out += fmt.Sprintf("|%-"+strconv.Itoa(tColW)+"s|%-"+strconv.Itoa(fColW)+"s|\n", "Token", "Freq")
-	out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
+	if !wordList {
 
-	// The actual useful info.
-	for _, k := range keys {
-		shortenBy := 0
-		// If character is a fullwidth char, add 1 to shortenBy.
-		for _, r := range k {
-			p := width.LookupRune(r)
-			if p.Kind() == width.EastAsianWide || p.Kind() == width.EastAsianFullwidth {
-				shortenBy++
+		// Sort tokens by frequency
+
+		heighestFreq := 0
+
+		keys := make([]string, 0, len(frequencies))
+		for token, freq := range frequencies {
+			keys = append(keys, token)
+			if freq > heighestFreq {
+				heighestFreq = freq
 			}
 		}
-		curTColW := strconv.Itoa(tColW - shortenBy)
-		fmtstr := "|%-" + curTColW + "s|%-" + strconv.Itoa(fColW) + "d|\n"
-		out += fmt.Sprintf(fmtstr, k, frequencies[k])
+
+		sort.Slice(keys, func(i, j int) bool {
+			// desc order
+			return frequencies[keys[i]] > frequencies[keys[j]]
+		})
+
+		tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq))+4
+
+		// Table Headers
+		out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
+		out += fmt.Sprintf("|%-"+strconv.Itoa(tColW)+"s|%-"+strconv.Itoa(fColW)+"s|\n", "Token", "Freq")
+		out += fmt.Sprint("|" + strings.Repeat("-", tColW) + "|" + strings.Repeat("-", fColW) + "|" + "\n")
+
+		// The actual useful info.
+		for _, k := range keys {
+			shortenBy := 0
+			// If character is a fullwidth char, add 1 to shortenBy.
+			for _, r := range k {
+				p := width.LookupRune(r)
+				if p.Kind() == width.EastAsianWide || p.Kind() == width.EastAsianFullwidth {
+					shortenBy++
+				}
+			}
+			curTColW := strconv.Itoa(tColW - shortenBy)
+			fmtstr := "|%-" + curTColW + "s|%-" + strconv.Itoa(fColW) + "d|\n"
+			out += fmt.Sprintf(fmtstr, k, frequencies[k])
+		}
+
+	} else {
+		for word, _ := range frequencies {
+			out += fmt.Sprintf("%s\n", word)
+		}
 	}
 
 	// Save result to file
@@ -138,7 +148,12 @@ func main() {
 	case mode.IsRegular():
 		actualOutPath = filepath.Dir(actualOutPath)
 	}
-	actualOutPath += "/freq.txt"
+
+	if wordList {
+		actualOutPath += "/words.txt"
+	} else {
+		actualOutPath += "/frequencies.txt"
+	}
 
 	err = WriteToFile(actualOutPath, out)
 	if err != nil {
@@ -151,6 +166,7 @@ func parseFlags() {
 	flag.StringVar(&outPath, "out", "", "destination of output file")
 	flag.BoolVar(&recurse, "r", true, "search through child directories?")
 	flag.BoolVar(&verbose, "v", false, "verbosity")
+	flag.BoolVar(&wordList, "wl", false, "output a list of unique words without frequencies")
 	flag.Parse()
 	if root == "" {
 		log.Println("Must provide a filepath with -in")
@@ -219,28 +235,33 @@ func WriteToFile(filename string, data string) error {
 func removeJunkFromToken(token string) string {
 	cleanToken := token
 
-  if utf8.RuneCountInString(token) == 1 {
-    uc := int([]rune(token)[0])
-    if hiraganaRange.start <= uc && uc <= hiraganaRange.end {
-      return ""
-    }
+	if utf8.RuneCountInString(token) == 1 {
+		uc := int([]rune(token)[0])
+		if hiraganaRange.start <= uc && uc <= hiraganaRange.end {
+			return ""
+		}
 
-    // The katakana dot separator. I want it removed if it's on its own but not elsewhere.
-    if uc == '\u30fb' {
-      return ""
-    }
-  }
+		// The katakana dot separator. I want it removed if it's on its own but not elsewhere.
+		if uc == '\u30fb' {
+			return ""
+		}
+
+		// Remove sokuon/chiisaitsu.
+		if uc == '\u3063' || uc == '\u30c3' || uc == '\uff6f' {
+			return ""
+		}
+	}
 
 	for _, char := range token {
-    inRange := false
+		inRange := false
 		for _, r := range validRanges {
 			if r.start <= int(char) && int(char) <= r.end {
-        inRange = true
+				inRange = true
 			}
 		}
-    if !inRange {
-		  cleanToken = strings.ReplaceAll(cleanToken, string(char), "")
-    }
+		if !inRange {
+			cleanToken = strings.ReplaceAll(cleanToken, string(char), "")
+		}
 	}
 	return cleanToken
 }

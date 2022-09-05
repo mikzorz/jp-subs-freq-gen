@@ -86,7 +86,6 @@ func main() {
 
 	var out string
 
-	if !wordList {
 
 		// Sort tokens by frequency
 
@@ -104,6 +103,8 @@ func main() {
 			// desc order
 			return frequencies[keys[i]] > frequencies[keys[j]]
 		})
+
+	if !wordList {
 
 		tColW, fColW := 2*longestTokenLen, len(strconv.Itoa(heighestFreq))+4
 
@@ -128,8 +129,8 @@ func main() {
 		}
 
 	} else {
-		for word, _ := range frequencies {
-			out += fmt.Sprintf("%s\n", word)
+		for _, k := range keys {
+			out += fmt.Sprintf("%s\n", k)
 		}
 	}
 
